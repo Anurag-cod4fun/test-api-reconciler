@@ -17,11 +17,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 try:
-    from api_client import build_session, paginated_fetch, _next_offset
+    from api_client import build_session, paginated_fetch, _next_offset, fetch_page
     from alds_adapter import BaseALDSAdapter
     from config import ApiConfig, EndpointConfig, ReconciliationConfig
 except ModuleNotFoundError:
-    from .api_client import build_session, paginated_fetch, _next_offset
+    from .api_client import build_session, paginated_fetch, _next_offset, fetch_page
     from .alds_adapter import BaseALDSAdapter
     from .config import ApiConfig, EndpointConfig, ReconciliationConfig
 
@@ -226,51 +226,80 @@ async def reconcile_endpoint(
         api_cfg.name, endpoint.name, endpoint.alds_table,
     )
 
+    # New strategy: fetch up to `page_concurrency` API pages concurrently,
+    # then fetch matching ALDS pages (blocking) and compare page pairs as they
+    # become available. This keeps memory usage bounded while improving
+    # throughput when network latency is the bottleneck.
+    page_concurrency = getattr(recon_cfg, "page_concurrency", 1) or 1
+
     async with build_session(api_cfg) as session:
-        async for api_page in paginated_fetch(api_cfg, endpoint, session):
-            page_number += 1
+        offset = 0
+        page_number = 0
 
-            # Fetch matching ALDS batch synchronously (wrap in executor for true async)
-            alds_page = await asyncio.get_event_loop().run_in_executor(
-                None,
-                alds_adapter.fetch_page,
-                endpoint,
-                offset,
-                endpoint.page_limit,
-            )
+        async def _fetch_api_page(off: int):
+            return await fetch_page(api_cfg, endpoint, session, off)
 
-            page_result = _compare_pages(
-                api_records=api_page,
-                alds_records=alds_page,
-                endpoint=endpoint,
-                page_number=page_number,
-                offset=offset,
-            )
+        while True:
+            # Launch up to `page_concurrency` API page fetches
+            offs = [offset + i * (endpoint.page_limit + 1) for i in range(page_concurrency)]
+            api_tasks = [asyncio.create_task(_fetch_api_page(off)) for off in offs]
 
-            result.page_results.append(page_result)
-            result.total_api_records   += page_result.api_record_count
-            result.total_alds_records  += page_result.alds_record_count
-            result.total_matched       += page_result.matched
-            result.total_field_mismatches  += sum(
-                len(rd.mismatches) for rd in page_result.field_mismatches
-            )
-            result.total_missing_in_alds   += len(page_result.missing_in_alds)
-            result.total_extra_in_alds     += len(page_result.extra_in_alds)
+            api_pages = await asyncio.gather(*api_tasks)
 
-            if page_result.field_mismatches or page_result.missing_in_alds or page_result.extra_in_alds:
-                logger.warning(
-                    "[%s › %s] Page %d — mismatches=%d missing=%d extra=%d",
-                    api_cfg.name, endpoint.name, page_number,
-                    len(page_result.field_mismatches),
-                    len(page_result.missing_in_alds),
-                    len(page_result.extra_in_alds),
-                )
-
-            if recon_cfg.fail_fast and not page_result.field_mismatches == [] == page_result.missing_in_alds == page_result.extra_in_alds:
-                logger.error("fail_fast=True — aborting reconciliation for %s", endpoint.name)
+            # If the first page is empty, we're done
+            if not api_pages or not api_pages[0]:
                 break
 
-            offset = _next_offset(offset, endpoint.page_limit)
+            # For each fetched API page, fetch ALDS batch and compare
+            for idx, api_page in enumerate(api_pages):
+                if not api_page:
+                    # empty page — stop pagination
+                    break
+
+                page_number += 1
+                off = offs[idx]
+
+                alds_page = await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    alds_adapter.fetch_page,
+                    endpoint,
+                    off,
+                    endpoint.page_limit,
+                )
+
+                page_result = _compare_pages(
+                    api_records=api_page,
+                    alds_records=alds_page,
+                    endpoint=endpoint,
+                    page_number=page_number,
+                    offset=off,
+                )
+
+                result.page_results.append(page_result)
+                result.total_api_records   += page_result.api_record_count
+                result.total_alds_records  += page_result.alds_record_count
+                result.total_matched       += page_result.matched
+                result.total_field_mismatches  += sum(
+                    len(rd.mismatches) for rd in page_result.field_mismatches
+                )
+                result.total_missing_in_alds   += len(page_result.missing_in_alds)
+                result.total_extra_in_alds     += len(page_result.extra_in_alds)
+
+                if page_result.field_mismatches or page_result.missing_in_alds or page_result.extra_in_alds:
+                    logger.warning(
+                        "[%s › %s] Page %d — mismatches=%d missing=%d extra=%d",
+                        api_cfg.name, endpoint.name, page_number,
+                        len(page_result.field_mismatches),
+                        len(page_result.missing_in_alds),
+                        len(page_result.extra_in_alds),
+                    )
+
+                if recon_cfg.fail_fast and not page_result.field_mismatches == [] == page_result.missing_in_alds == page_result.extra_in_alds:
+                    logger.error("fail_fast=True — aborting reconciliation for %s", endpoint.name)
+                    break
+
+            # advance to the next window of offsets
+            offset = _next_offset(offset, endpoint.page_limit * page_concurrency + (page_concurrency - 1))
 
     result.total_pages    = page_number
     result.duration_seconds = time.perf_counter() - t0

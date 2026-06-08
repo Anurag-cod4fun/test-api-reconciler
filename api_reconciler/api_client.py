@@ -246,3 +246,22 @@ def build_session(api_cfg: ApiConfig) -> aiohttp.ClientSession:
     }
     connector = aiohttp.TCPConnector(limit=20, ttl_dns_cache=300)
     return aiohttp.ClientSession(headers=headers, connector=connector)
+
+
+async def fetch_page(api_cfg: ApiConfig, endpoint: EndpointConfig, session: aiohttp.ClientSession, offset: int) -> list[dict]:
+    """Fetch a single page (by offset) and return the extracted records list.
+
+    This helper complements `paginated_fetch` and is useful when multiple
+    pages need to be fetched concurrently.
+    """
+    url = f"{api_cfg.base_url.rstrip('/')}/{endpoint.api_path.lstrip('/') }"
+    params = _build_page_params(endpoint, offset, extra_static={})
+    raw = await _fetch_with_retry(
+        session=session,
+        url=url,
+        params=params,
+        max_retries=api_cfg.max_retries,
+        backoff_factor=api_cfg.retry_backoff_factor,
+        timeout=api_cfg.timeout_seconds,
+    )
+    return _extract_records(raw, endpoint.name)

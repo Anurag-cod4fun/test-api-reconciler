@@ -75,6 +75,7 @@ class ReconciliationConfig:
     report_dir: str = "reports"     # Directory for JSON/CSV reconciliation reports
     fail_fast: bool = False         # Stop on first mismatch if True
     log_level: str = "INFO"         # DEBUG | INFO | WARNING | ERROR
+    page_concurrency: int = 1        # Number of pages to validate concurrently per endpoint
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -119,67 +120,67 @@ APIS: list[ApiConfig] = [
                 page_limit=200,
             ),
         ],
-    ),
+    )
 
     # ── API 2: Orders Service ────────────────────────────────────────────
     # MOCK → http://127.0.0.1:8102
     # PROD → replace base_url e.g. "https://orders-api.yourcompany.com"
-    ApiConfig(
-        name="OrdersAPI",
-        base_url="http://127.0.0.1:8102",
-        auth_token="mock-token",
-        timeout_seconds=45,
-        max_retries=3,
-        retry_backoff_factor=2.0,
-        endpoints=[
-            EndpointConfig(
-                name="orders",
-                api_path="/v2/orders",
-                alds_table="raw.orders",
-                primary_key="order_id",
-                page_limit=100,
-                # PROD: add api_params={"status": "all"} if your API needs it
-                ignore_fields=["updated_at"],
-            ),
-            EndpointConfig(
-                name="order_items",
-                api_path="/v2/orders/items",
-                alds_table="raw.order_items",
-                primary_key="item_id",
-                page_limit=500,
-            ),
-        ],
-    ),
+    # ApiConfig(
+    #     name="OrdersAPI",
+    #     base_url="http://127.0.0.1:8102",
+    #     auth_token="mock-token",
+    #     timeout_seconds=45,
+    #     max_retries=3,
+    #     retry_backoff_factor=2.0,
+    #     endpoints=[
+    #         EndpointConfig(
+    #             name="orders",
+    #             api_path="/v2/orders",
+    #             alds_table="raw.orders",
+    #             primary_key="order_id",
+    #             page_limit=100,
+    #             # PROD: add api_params={"status": "all"} if your API needs it
+    #             ignore_fields=["updated_at"],
+    #         ),
+    #         EndpointConfig(
+    #             name="order_items",
+    #             api_path="/v2/orders/items",
+    #             alds_table="raw.order_items",
+    #             primary_key="item_id",
+    #             page_limit=500,
+    #         ),
+    #     ],
+    # ),
 
-    # ── API 3: Inventory Service ─────────────────────────────────────────
-    # MOCK → http://127.0.0.1:8103
-    # PROD → replace base_url e.g. "https://inventory-api.yourcompany.com"
-    ApiConfig(
-        name="InventoryAPI",
-        base_url="http://127.0.0.1:8103",
-        auth_token="mock-token",
-        timeout_seconds=30,
-        max_retries=2,
-        retry_backoff_factor=1.0,
-        endpoints=[
-            EndpointConfig(
-                name="products",
-                api_path="/v1/products",
-                alds_table="raw.products",
-                primary_key="product_id",
-                page_limit=100,
-                # API returns prod_name/prod_sku → ALDS stores them as name/sku
-                field_mapping={"prod_name": "name", "prod_sku": "sku"},
-            ),
-            EndpointConfig(
-                name="warehouses",
-                api_path="/v1/warehouses",
-                alds_table="raw.warehouses",
-                primary_key="warehouse_id",
-                page_limit=50,
-            ),
-        ],
-    ),
+    # # ── API 3: Inventory Service ─────────────────────────────────────────
+    # # MOCK → http://127.0.0.1:8103
+    # # PROD → replace base_url e.g. "https://inventory-api.yourcompany.com"
+    # ApiConfig(
+    #     name="InventoryAPI",
+    #     base_url="http://127.0.0.1:8103",
+    #     auth_token="mock-token",
+    #     timeout_seconds=30,
+    #     max_retries=2,
+    #     retry_backoff_factor=1.0,
+    #     endpoints=[
+    #         EndpointConfig(
+    #             name="products",
+    #             api_path="/v1/products",
+    #             alds_table="raw.products",
+    #             primary_key="product_id",
+    #             page_limit=100,
+    #             # API returns prod_name/prod_sku → ALDS stores them as name/sku
+    #             field_mapping={"prod_name": "name", "prod_sku": "sku"},
+    #         ),
+    #         EndpointConfig(
+    #             name="warehouses",
+    #             api_path="/v1/warehouses",
+    #             alds_table="raw.warehouses",
+    #             primary_key="warehouse_id",
+    #             page_limit=50,
+    #         ),
+    #     ],
+    # ),
 ]
 
 # ─────────────────────────────────────────────
