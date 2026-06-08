@@ -1,0 +1,98 @@
+{
+  "status": "CLEAN",
+  "run_utc": "2026-06-07T20:17:36.773005+00:00",
+  "totals": {
+    "endpoints": 6,
+    "api_records": 2256,
+    "matched": 2256,
+    "field_mismatches": 0,
+    "missing_in_alds": 0,
+    "extra_in_alds": 0
+  },
+  "endpoints": [
+    {
+      "api": "CustomerAPI",
+      "endpoint": "customers",
+      "alds_table": "raw.customers",
+      "status": "CLEAN",
+      "pages": 4,
+      "api_records": 347,
+      "alds_records": 347,
+      "matched": 347,
+      "field_mismatches": 0,
+      "missing_in_alds": 0,
+      "extra_in_alds": 0,
+      "duration_seconds": 0.23
+    },
+    {
+      "api": "CustomerAPI",
+      "endpoint": "customer_addresses",
+      "alds_table": "raw.customer_addresses",
+      "status": "CLEAN",
+      "pages": 3,
+      "api_records": 518,
+      "alds_records": 518,
+      "matched": 518,
+      "field_mismatches": 0,
+      "missing_in_alds": 0,
+      "extra_in_alds": 0,
+      "duration_seconds": 0.22
+    },
+    {
+      "api": "OrdersAPI",
+      "endpoint": "orders",
+      "alds_table": "raw.orders",
+      "status": "CLEAN",
+      "pages": 3,
+      "api_records": 273,
+      "alds_records": 273,
+      "matched": 273,
+      "field_mismatches": 0,
+      "missing_in_alds": 0,
+      "extra_in_alds": 0,
+      "duration_seconds": 0.22
+    },
+    {
+      "api": "OrdersAPI",
+      "endpoint": "order_items",
+      "alds_table": "raw.order_items",
+      "status": "CLEAN",
+      "pages": 2,
+      "api_records": 899,
+      "alds_records": 899,
+      "matched": 899,
+      "field_mismatches": 0,
+      "missing_in_alds": 0,
+      "extra_in_alds": 0,
+      "duration_seconds": 0.21
+    },
+    {
+      "api": "InventoryAPI",
+      "endpoint": "products",
+      "alds_table": "raw.products",
+      "status": "CLEAN",
+      "pages": 2,
+      "api_records": 179,
+      "alds_records": 179,
+      "matched": 179,
+      "field_mismatches": 0,
+      "missing_in_alds": 0,
+      "extra_in_alds": 0,
+      "duration_seconds": 0.2
+    },
+    {
+      "api": "InventoryAPI",
+      "endpoint": "warehouses",
+      "alds_table": "raw.warehouses",
+      "status": "CLEAN",
+      "pages": 1,
+      "api_records": 40,
+      "alds_records": 40,
+      "matched": 40,
+      "field_mismatches": 0,
+      "missing_in_alds": 0,
+      "extra_in_alds": 0,
+      "duration_seconds": 0.03
+    }
+  ]
+}

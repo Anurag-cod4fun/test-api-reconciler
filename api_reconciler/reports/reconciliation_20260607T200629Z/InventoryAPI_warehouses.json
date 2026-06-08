@@ -1,0 +1,27 @@
+{
+  "api_name": "InventoryAPI",
+  "endpoint_name": "warehouses",
+  "alds_table": "raw.warehouses",
+  "total_pages": 1,
+  "total_api_records": 40,
+  "total_alds_records": 40,
+  "total_matched": 40,
+  "total_field_mismatches": 0,
+  "total_missing_in_alds": 0,
+  "total_extra_in_alds": 0,
+  "page_results": [
+    {
+      "page_number": 1,
+      "offset": 0,
+      "api_record_count": 40,
+      "alds_record_count": 40,
+      "matched": 40,
+      "field_mismatches": [],
+      "missing_in_alds": [],
+      "extra_in_alds": [],
+      "errors": []
+    }
+  ],
+  "errors": [],
+  "duration_seconds": 0.050630300014745444
+}

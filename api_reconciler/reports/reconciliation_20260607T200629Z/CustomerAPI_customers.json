@@ -1,0 +1,60 @@
+{
+  "api_name": "CustomerAPI",
+  "endpoint_name": "customers",
+  "alds_table": "raw.customers",
+  "total_pages": 4,
+  "total_api_records": 347,
+  "total_alds_records": 347,
+  "total_matched": 347,
+  "total_field_mismatches": 0,
+  "total_missing_in_alds": 0,
+  "total_extra_in_alds": 0,
+  "page_results": [
+    {
+      "page_number": 1,
+      "offset": 0,
+      "api_record_count": 100,
+      "alds_record_count": 100,
+      "matched": 100,
+      "field_mismatches": [],
+      "missing_in_alds": [],
+      "extra_in_alds": [],
+      "errors": []
+    },
+    {
+      "page_number": 2,
+      "offset": 101,
+      "api_record_count": 100,
+      "alds_record_count": 100,
+      "matched": 100,
+      "field_mismatches": [],
+      "missing_in_alds": [],
+      "extra_in_alds": [],
+      "errors": []
+    },
+    {
+      "page_number": 3,
+      "offset": 202,
+      "api_record_count": 100,
+      "alds_record_count": 100,
+      "matched": 100,
+      "field_mismatches": [],
+      "missing_in_alds": [],
+      "extra_in_alds": [],
+      "errors": []
+    },
+    {
+      "page_number": 4,
+      "offset": 303,
+      "api_record_count": 47,
+      "alds_record_count": 47,
+      "matched": 47,
+      "field_mismatches": [],
+      "missing_in_alds": [],
+      "extra_in_alds": [],
+      "errors": []
+    }
+  ],
+  "errors": [],
+  "duration_seconds": 0.21518050000304356
+}
