@@ -17,7 +17,7 @@ What it simulates
 
 Run:
     python mock_server.py              # server only, Ctrl-C to stop
-    python mock_server.py --run-recon  # server + full reconciliation run
+    python mock_server.py --alds-mismatch-rate 0.05
 """
 
 import argparse
@@ -47,6 +47,7 @@ PORTS = {
 }
 
 ALDS_PORT = 8104
+ALDS_MISMATCH_RATE = 0.0
 
 
 # ─────────────────────────────────────────────────────────────
@@ -137,6 +138,41 @@ def _gen_warehouses(n: int) -> list[dict]:
     ]
 
 
+def _tamper_value(value: Any) -> Any:
+    if isinstance(value, bool):
+        return not value
+    if isinstance(value, int):
+        return value + 1
+    if isinstance(value, float):
+        return round(value + 0.01, 2)
+    if isinstance(value, str):
+        return f"{value}_ALDS"
+    return value
+
+
+def _inject_alds_mismatches(records: list[dict], primary_key: str, rate: float) -> list[dict]:
+    if rate <= 0:
+        return records
+
+    tampered = copy.deepcopy(records)
+    candidate_fields = None
+
+    for record in tampered:
+        if random.random() >= rate:
+            continue
+
+        if candidate_fields is None:
+            candidate_fields = [field for field in record.keys() if field != primary_key]
+
+        if not candidate_fields:
+            continue
+
+        field_name = random.choice(candidate_fields)
+        record[field_name] = _tamper_value(record[field_name])
+
+    return tampered
+
+
 # ─────────────────────────────────────────────────────────────
 #  Master data store  (shared between HTTP server + ALDS adapter)
 # ─────────────────────────────────────────────────────────────
@@ -158,9 +194,20 @@ class DataStore:
         }
 
         # ── Deep-copy for ALDS ──────────────────────────────
-        self._alds: dict[str, list[dict]] = copy.deepcopy(self._api)
+        self._alds: dict[str, list[dict]] = {
+            "customers": _inject_alds_mismatches(self._api["customers"], "customer_id", ALDS_MISMATCH_RATE),
+            "customer_addresses": _inject_alds_mismatches(self._api["customer_addresses"], "address_id", ALDS_MISMATCH_RATE),
+            "orders": _inject_alds_mismatches(self._api["orders"], "order_id", ALDS_MISMATCH_RATE),
+            "order_items": _inject_alds_mismatches(self._api["order_items"], "item_id", ALDS_MISMATCH_RATE),
+            "products": _inject_alds_mismatches(self._api["products"], "product_id", ALDS_MISMATCH_RATE),
+            "warehouses": _inject_alds_mismatches(self._api["warehouses"], "warehouse_id", ALDS_MISMATCH_RATE),
+        }
 
-        logger.info("DataStore ready — %d datasets loaded", len(self._api))
+        logger.info(
+            "DataStore ready — %d datasets loaded (alds_mismatch_rate=%.3f)",
+            len(self._api),
+            ALDS_MISMATCH_RATE,
+        )
 
     # ── API data access ──────────────────────────────────────
 
@@ -409,51 +456,14 @@ MOCK_ALDS_CONFIG  = AldsConfig(adapter_type="mock")
 MOCK_RECON_CONFIG = ReconciliationConfig(concurrency=6, report_dir="reports", log_level="INFO")
 
 
-# ─────────────────────────────────────────────────────────────
-#  Full reconciliation run (wired to mock server + ALDS)
-# ─────────────────────────────────────────────────────────────
-
-async def run_mock_reconciliation() -> int:
-    """
-    Starts servers, runs reconciliation, writes reports, stops servers.
-    Returns 0 (clean) or 1 (discrepancies).
-    """
-    from api_reconciler.reconciler import reconcile_endpoint
-    from api_reconciler.reporter import ReconciliationReporter
-
-    runners = await start_servers()
-    await asyncio.sleep(0.2)          # let sockets bind
-
-    alds_adapter = LiveMockALDSAdapter(MOCK_ALDS_CONFIG)
-    sem = asyncio.Semaphore(MOCK_RECON_CONFIG.concurrency)
-
-    async def _task(api_cfg, endpoint):
-        async with sem:
-            return await reconcile_endpoint(api_cfg, endpoint, alds_adapter, MOCK_RECON_CONFIG)
-
-    tasks = [
-        asyncio.create_task(_task(api_cfg, ep), name=f"{api_cfg.name}:{ep.name}")
-        for api_cfg in MOCK_API_CONFIGS
-        for ep in api_cfg.endpoints
-    ]
-
-    results = await asyncio.gather(*tasks)
-    await stop_servers(runners)
-
-    reporter = ReconciliationReporter(report_dir=MOCK_RECON_CONFIG.report_dir)
-    reporter.write_all(list(results))
-
-    return 0 if all(r.is_clean for r in results) else 1
-
-
-# ─────────────────────────────────────────────────────────────
-#  CLI
-# ─────────────────────────────────────────────────────────────
-
 def _parse_args():
     p = argparse.ArgumentParser(description="Mock API server for reconciler testing")
-    p.add_argument("--run-recon", action="store_true",
-                   help="Run full reconciliation then exit (default: keep server alive)")
+    p.add_argument(
+        "--alds-mismatch-rate",
+        type=float,
+        default=0.0,
+        help="Inject field mismatches into ALDS data at the given rate (0.0-1.0)",
+    )
     p.add_argument("--log-level", default="INFO",
                    choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     return p.parse_args()
@@ -474,6 +484,8 @@ async def _serve_forever():
 
 def main() -> int:
     args = _parse_args()
+    global ALDS_MISMATCH_RATE
+    ALDS_MISMATCH_RATE = max(0.0, min(1.0, args.alds_mismatch_rate))
     logging.basicConfig(
         level=getattr(logging, args.log_level.upper(), logging.INFO),
         format="%(asctime)s  %(levelname)-8s  %(name)s — %(message)s",
@@ -481,11 +493,8 @@ def main() -> int:
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 
-    if args.run_recon:
-        return asyncio.run(run_mock_reconciliation())
-    else:
-        asyncio.run(_serve_forever())
-        return 0
+    asyncio.run(_serve_forever())
+    return 0
 
 
 if __name__ == "__main__":

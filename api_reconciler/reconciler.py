@@ -16,8 +16,6 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-import aiohttp
-
 try:
     from api_client import build_session, paginated_fetch, _next_offset
     from alds_adapter import BaseALDSAdapter
