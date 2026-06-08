@@ -244,7 +244,8 @@ def _paginate(request: web.Request, dataset: str) -> web.Response:
         raise web.HTTPBadRequest(reason="offset and pagelimit must be integers")
 
     records = get_store().api_page(dataset, offset, page_limit)
-    return web.json_response({"data": records, "offset": offset, "pagelimit": page_limit})
+    # Return a plain JSON array of records (root is a list)
+    return web.json_response(records)
 
 
 # CustomerAPI handlers
@@ -323,7 +324,8 @@ def _alds_paginate(request: web.Request, dataset: str) -> web.Response:
         raise web.HTTPBadRequest(reason="offset and pagelimit must be integers")
 
     records = get_store().alds_page(dataset, offset, page_limit)
-    return web.json_response({"data": records, "offset": offset, "pagelimit": page_limit})
+    # ALDS endpoints also return a plain JSON array to match API responses
+    return web.json_response(records)
 
 
 async def alds_records(req: web.Request) -> web.Response:

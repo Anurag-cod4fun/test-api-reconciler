@@ -214,9 +214,15 @@ class RestALDSAdapter(BaseALDSAdapter):
         except URLError as exc:
             raise RuntimeError(f"Unable to reach ALDS at {url}") from exc
 
-        records = payload.get("data", [])
-        if not isinstance(records, list):
-            raise ValueError(f"Unexpected ALDS payload from {url}: missing list under 'data'")
+        # ALDS MAY return either a root JSON list or an object with a 'data' list.
+        if isinstance(payload, list):
+            records = payload
+        elif isinstance(payload, dict) and isinstance(payload.get("data", None), list):
+            records = payload.get("data", [])
+        else:
+            raise ValueError(
+                f"Unexpected ALDS payload from {url}: expected list or dict with 'data' list"
+            )
         return records
 
     def close(self) -> None:
